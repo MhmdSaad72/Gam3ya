@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Http\Controllers\Poor;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests;
+
+use App\Poor\Child;
+use App\Poor\FamilyDetail;
+use App\Poor\OrphanSponser;
+use Illuminate\Http\Request;
+use Carbon\Carbon;
+
+class ChildrenController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\View\View
+     */
+    public function index(Request $request)
+    {
+        $keyword = $request->get('search');
+        $perPage = 10;
+
+        if (!empty($keyword)) {
+            $children = Child::where('name', 'LIKE', "%$keyword%")
+                ->orWhere('birth_date', 'LIKE', "%$keyword%")
+                ->orWhereHas('family', function ($query) use ($keyword) {
+                $query->where('name', 'LIKE', "%$keyword%");})
+                // ->orWhereHas('orphanSponser', function ($query) use ($keyword) {
+                // $query->where('name', 'LIKE', "%$keyword%");})
+                ->latest()->paginate($perPage);
+        } else {
+            $children = Child::latest()->paginate($perPage);
+        }
+
+        return view('poor-people.children.index', compact('children'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\View\View
+     */
+    public function create()
+    {
+        $families = FamilyDetail::all();
+        $orphanSponsers = OrphanSponser::all();
+
+        return view('poor-people.children.create', compact('child' , 'families'  , 'orphanSponsers'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    public function store(Request $request)
+    {
+        $today = Carbon::now()->format('Y-m-d');
+        $this->validate($request, [
+    			'name' => 'required|min:2|max:30',
+          'birth_date' => 'required|date|before:' . $today,
+          'national_id' => 'required|size:14|unique:childrens,national_id,NULL,id,deleted_at,NULL',
+          'academic_year' => 'required|min:1|max:30',
+          'social_status' => 'required',
+          'type' => 'required',
+          // 'orphan_sponser_id' => 'required',
+    		]);
+        $requestData = $request->all();
+
+        Child::create($requestData);
+
+        return redirect('poor-people/children')->with('flash_message', 'تم اضافة طفل!');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     *
+     * @return \Illuminate\View\View
+     */
+    public function show($id)
+    {
+        $child = Child::findOrFail($id);
+        $families = FamilyDetail::all();
+        $orphanSponsers = OrphanSponser::all();
+
+        return view('poor-people.children.show', compact('child' , 'families'  , 'orphanSponsers'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  int  $id
+     *
+     * @return \Illuminate\View\View
+     */
+    public function edit($id)
+    {
+        $child = Child::findOrFail($id);
+        $families = FamilyDetail::all();
+        $orphanSponsers = OrphanSponser::all();
+
+        return view('poor-people.children.edit', compact('child' , 'families' , 'orphanSponsers'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @param  int  $id
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    public function update(Request $request, $id)
+    {
+        $child = Child::findOrFail($id);
+        $today = Carbon::now()->format('Y-m-d');
+        $this->validate($request, [
+          'name' => 'required|min:2|max:30',
+          'birth_date' => 'required|date|before:' . $today,
+          'national_id' => 'required|size:14|unique:childrens,national_id,'. $child->id . ',id,deleted_at,NULL',
+          'academic_year' => 'required|min:1|max:30',
+          'social_status' => 'required',
+          'type' => 'required',
+          // 'orphan_sponser_id' => 'required',
+    		]);
+        $requestData = $request->all();
+
+        $child->update($requestData);
+
+        return redirect('poor-people/children')->with('flash_message', 'تم تحديث الطفل!');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    public function destroy($id)
+    {
+        Child::destroy($id);
+
+        return redirect('poor-people/children')->with('flash_message', 'تم حذف الطفل!');
+    }
+}
